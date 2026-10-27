@@ -10,6 +10,8 @@ import pandas as pd
 import gdown
 import os
 
+os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
+
 #pour voir toutes les colonnes dans les sorties python
 pd.set_option("display.max_columns", None)  
 
@@ -22,6 +24,7 @@ FICHIER_LOCAL = "DVF-2026-S1.txt"
 #                                  import data                                           #
 #                                                                                        #                      
 ##########################################################################################
+
 
 
 ######################## espaces verts actuels et supplémentaires ########################
@@ -47,7 +50,6 @@ dvf_2026 = pd.read_csv(
     low_memory=False,
     encoding="utf-8",   # essaie "latin-1" si les accents sont cassés
 )
-
 #visualisation 
 print(dvf_2026.shape)
 print(dvf_2026.head())
@@ -58,62 +60,68 @@ print(dvf_2026.head())
 #                                                                                        #                      
 ##########################################################################################
 
+############################on ne conserve que Paris centre (75) #########################
+ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").isin([f"750{i:02d}" for i in range(1, 21)])]
+dvf_2026 = dvf_2026[dvf_2026["Code departement"] == "75"]
 ############################ on enlève les colonnes inutiles #############################
-col_to_drop = {
-    ev_actuels : ["Identifiant espace vert", "Typologie d'espace vert", 
-                                      "Présence cloture", "Année de rénovation","Ancien nom de l'espace vert", 
+col_to_drop = [
+    (ev_actuels, ["Identifiant espace vert", "Présence cloture",
+                                     "Année de rénovation","Ancien nom de l'espace vert", 
                                       "Année de changement de nom","Nombre d'entités", 
                                         "Ouverture 24h_24h",
                                         "ID_DIVISION", "ID_ATELIER_HORTICOLE", "IDA3D_ENB", "ID_EQPT",
                                         "Compétence","last_edited_user",
-                                        "last_edited_date" ],
-    ev_supp : ["Type d'opération ", "Secteur adminsitratif"]}
+                                        "last_edited_date" ]),
+    (ev_supp, ["Type d'opération", "Secteur administratif"]),
+    (dvf_2026, ["Identifiant de document", "Reference document", "1 Articles CGI", "2 Articles CGI",
+                                        "3 Articles CGI", "4 Articles CGI", "5 Articles CGI",
+                                        "No disposition", "B/T/Q", "Commune", "Code commune",
+                                        "Prefixe de section", "No plan", "No Volume",
+                                        "Identifiant local", "Nature culture speciale"]),
+                                        ]
+    
 
-for df, cols in col_to_drop.items():
+for df, cols in col_to_drop:
     df.drop(columns=cols, inplace=True)
-
 
 ############################ harmonisation des noms de colonnes ##########################
 
 ############################### harmonisation des types ##################################
+##
+col_to_integer = [
+    (ev_actuels, ["Adresse - Numéro", "Code postal", "Surface calculée", "Superficie totale réelle",
+            "Surface horticole", "Année de l'ouverture"]),
+    (ev_supp, ["M2 d’espaces verts supplémentaires"]),
+    (dvf_2026, ["No voie", "Code postal",
+            "Code type local", "Surface reelle bati", "Nombre pieces principales",
+            "Surface terrain"])
+]
 
-col_to_integer = {
-    ev_actuels : ['Adresse - Numéro', "Code postal", "Surface calculée", "Superficie totale réelle",
-                    "Surface horticole", "Année de l'ouverture"],
-    ev_supp : ["M2 d'espaces verts supplémentaires"]}
-
-for df, cols in col_to_integer.items():
+for df, cols in col_to_integer:
     for col in cols:
-        df[col] = df[col].astype('Int64')
+        df[col] = df[col].astype("Int64")
 
-print(ev_actuels.info())
-print(ev_supp.info())
-
+#print(ev_actuels.info())
+#print(ev_supp.info())
+#print(dvf_2026.info())
 ############################## harmonisation des valeurs nulles ou NAN #####################
 
 # on détecte les valeurs qui correspondent à des NaN (certains 0 sont des NaN, d'autres sont des valeurs réelles)
-print(ev_actuels.describe())
-print(ev_supp.describe())
+#print(ev_actuels.describe())
+#print(ev_supp.describe())
+#print(dvf_2026.describe())
+col_zero_to_nan = [(ev_actuels, ["Adresse - Numéro"])]
+col_val_to_nan = [(ev_actuels, ["Année de l'ouverture"])]
 
-col_zero_to_nan = { ev_actuels : ["Surface calculée", "Surface horticole", "Périmètre", "Adresse - Numéro"]
-                   }
-col_val_to_nan = { ev_actuels : ["Année de l'ouverture"] }
-
-for df, cols in col_zero_to_nan.items():
+for df, cols in col_zero_to_nan:
     for col in cols:
         df[col] = df[col].replace(0, np.nan)
 
-for df, cols in col_val_to_nan.items():
+for df, cols in col_val_to_nan:
     for col in cols:
         df[col] = df[col].replace(9999, np.nan)
 
-##### fusion de colonnes 
-# adresse et surface pour les espaces verts actuels 
 
-############################### tri des données #####################################
-
-#on ne conserve que Paris centre (75)
-ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").isin([f"750{i:02d}" for i in range(1, 21)])]
 
 
 ##########################################################################################
