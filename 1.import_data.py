@@ -72,16 +72,49 @@ dvf_2025 = pd.read_csv(
 print(dvf_2025.shape)
 print(dvf_2025.head())
 
-##########################################################################################
+#############################’#############################################################
 #                                                                                        #
 #                                  nettoyage des données                                 #
 #                                                                                        #                      
 ##########################################################################################
 
 ############################on ne conserve que Paris centre (75) #########################
-ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").isin([f"750{i:02d}" for i in range(1, 21)])]
+ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").str.startswith("75")]
 dvf_2026 = dvf_2026[dvf_2026["Code departement"] == "75"]
 dvf_2025 = dvf_2025[dvf_2025["Code departement"] == "75"]
+
+########################### on ne conserve que les types d'espaces verts utiles ###########
+
+# visualisation pour faire le tri 
+
+# (ev_actuels[["Typologie d'espace vert", "Catégorie"]]
+#     .drop_duplicates()
+#     .sort_values(["Typologie d'espace vert", "Catégorie"]))
+
+categories_to_keep = [ 'Jardin',
+ 'Square',
+ 'Promenade',
+ #'Murs vegetalises',
+ 'Espace Vert',
+ 'Jardin partage',
+ 'Parc',
+ 'Pelouse',
+ 'Arboretum',
+ 'Mail',
+ "Jardin d'immeubles",
+ 'Archipel',
+ 'Foret urbaine',
+ 'Terrain de boules',
+ 'jardiniere',
+ 'Bois',
+ 'Ile']
+types_to_keep = ["Bois", "Ephémères, partagés, pédagogiques", "Jardinets décoratifs", "Promenades ouvertes",
+                      "Végétalisation d'espace public"]
+ev_actuels = ev_actuels[ev_actuels["Typologie d'espace vert"].isin(types_to_keep)]
+ev_actuels = ev_actuels[ev_actuels["Catégorie"].isin(categories_to_keep)]
+
+# stats après tri : il reste 762 lignes sur 2535 au départ 
+
 ############################ on enlève les colonnes inutiles #############################
 col_to_drop = [
     (ev_actuels, ["Identifiant espace vert", "Présence cloture",
