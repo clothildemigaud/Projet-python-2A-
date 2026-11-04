@@ -169,29 +169,6 @@ col_to_drop = [
 for df, cols in col_to_drop:
     df.drop(columns=cols, inplace=True)
 
-############################ harmonisation des noms de colonnes ##########################
-# pr dvf : on garde les variables intéressantes et on donne des noms simples 
-colonnes = {
-    'idmutation': 'id_vente',
-    'datemut': 'date',
-    'anneemut': 'annee',
-    'moismut': 'mois',
-    'l_codinsee': 'code_arrondissement',
-    'l_idpar': 'id_parcelle',
-    'valeurfonc': 'prix_euros',
-    'sbatapt': 'surface_m2',
-    'prix_m2': 'prix_m2',
-    'nblocdep': 'nb_dependances',
-    'avec_dependance': 'avec_dependance',
-    'nb_pieces': 'nb_pieces',
-    'geompar_x': 'x_lambert93',
-    'geompar_y': 'y_lambert93',
-    'log_prix_m2': 'log_prix_m2',
-    'log_surface': 'log_surface',
-}
-dvf_plus = dvf_plus[list(colonnes)].rename(columns=colonnes)
-dvf_ = dvf_plus.sort_values(['date', 'id_vente']).reset_index(drop=True)
-
 
 ############################### harmonisation des types ##################################
 ##
@@ -234,23 +211,46 @@ for df, cols in col_val_to_nan:
         df[col] = df[col].replace(9999, np.nan)
 
 # On supprimes les données manquantes ou atypiques pour dvf_plus 
-necessaires = ['prix_euros', 'surface_m2', 'x_lambert93', 'y_lambert93']
+necessaires = ['valeurfonc', 'sbatapt', 'geompar_x', 'geompar_y']
 dvf_plus = dvf_plus.dropna(subset=necessaires).copy()
-dvf_plus = dvf_plus[dvf_plus['prix_euros'] > 0].copy()
-dvf_plus = dvf_plus[dvf_plus['surface_m2'].between(9, 300)].copy()
+dvf_plus = dvf_plus[dvf_plus['valeurfonc'] > 0].copy()
+dvf_plus = dvf_plus[dvf_plus['sbatapt'].between(9, 300)].copy()
 
-dvf_plus['prix_m2'] = dvf_plus['prix_euros'] / dvf_plus['surface_m2']
+dvf_plus['prix_m2'] = dvf_plus['valeurfonc'] / dvf_plus['sbatapt']
 dvf_plus = dvf_plus[dvf_plus['prix_m2'].between(1000, 30000)].copy()
 
 ############################ création des variables utiles pour la régression ############
-dvf_plus['avec_dependance'] = (dvf_plus['nb_dependances'] > 0).astype(int)
+dvf_plus['avec_dependance'] = (dvf_plus['nblocdep'] > 0).astype(int)
 dvf_plus['nb_pieces'] = (
     dvf_plus['nbapt1pp'] + 2 * dvf_plus['nbapt2pp'] + 3 * dvf_plus['nbapt3pp']
     + 4 * dvf_plus['nbapt4pp'] + 5 * dvf_plus['nbapt5pp']
 )  # 5 signifie 5 pieces ou plus
 
 dvf_plus['log_prix_m2'] = np.log(dvf_plus['prix_m2'])
-dvf_plus['log_surface'] = np.log(dvf_plus['surface_m2'])
+dvf_plus['log_surface'] = np.log(dvf_plus['sbatapt'])
+
+############################ harmonisation des noms de colonnes ##########################
+# pr dvf : on garde les variables intéressantes et on donne des noms simples 
+colonnes = {
+    'idmutation': 'id_vente',
+    'datemut': 'date',
+    'anneemut': 'annee',
+    'moismut': 'mois',
+    'l_codinsee': 'code_arrondissement',
+    'l_idpar': 'id_parcelle',
+    'valeurfonc': 'prix_euros',
+    'sbatapt': 'surface_m2',
+    'prix_m2': 'prix_m2',
+    'nblocdep': 'nb_dependances',
+    'avec_dependance': 'avec_dependance',
+    'nb_pieces': 'nb_pieces',
+    'geompar_x': 'x_lambert93',
+    'geompar_y': 'y_lambert93',
+    'log_prix_m2': 'log_prix_m2',
+    'log_surface': 'log_surface',
+}
+dvf_plus = dvf_plus[list(colonnes)].rename(columns=colonnes)
+dvf_plus = dvf_plus.sort_values(['date', 'id_vente']).reset_index(drop=True)
 
 # 7. Verifications 
 assert dvf_plus['id_vente'].is_unique, 'Attention : ventes en double'
@@ -269,7 +269,7 @@ dvf_plus.to_csv('dvf_paris_nettoyee.csv', index=False)
 sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
 sans_dependances.to_csv('dvf_paris_sans_dependances.csv', index=False)
 
-print('Ventes conservees :', len(df))
+print('Ventes conservees :', len(dvf_plus))
 print('Sans dependances :', len(sans_dependances))
 print('Ventes par annee :')
 print(df['annee'].value_counts().sort_index())
