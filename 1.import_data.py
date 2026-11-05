@@ -7,7 +7,6 @@
 
 import numpy as np 
 import pandas as pd
-import zipfile
 import gdown
 import os
 
@@ -17,14 +16,9 @@ os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vsc
 pd.set_option("display.max_columns", None)  
 
 ## paramètres (pour les données foncières) 
-# pr le fichier zip 
 FILE_DVF_PLUS_ID = "1Mnsnm-OCvw-5zLuVBf6p41NtDChE_yg1"
 FICHIER_LOCAL_DVF_PLUS = "dvf_plus_d75.csv"
-#anciennes bases 
-FILE_ID_26 = "1A9e-cSJgbGsv7mFS24ncDGyU7ckDr7Db"
-FICHIER_LOCAL_26 = "DVF-2026-S1.txt"
-FILE_ID_25 = "1mPm7rU1sN5c3udpn_VbAFNhqNxSIRdUs"
-FICHIER_LOCAL_25 = "ValeursFoncieres-2025.txt"
+
 
 ##########################################################################################
 #                                                                                        #
@@ -44,7 +38,7 @@ print(ev_actuels.head(10))
 print(ev_supp.head(10))
 
 #################################### données foncières ###################################
-# fichiers volumineux donc télécharge automatiquement en local à partir du drive partagé
+# fichiers volumineux donc télécharge automatiquement en local à partir du drive partagé (mettre noms dans le gitignore)
 # Téléchargement uniquement si le fichier n'existe pas déjà
 
 # dvf + : ventes d'appartement sur 2023 -2025
@@ -52,36 +46,6 @@ if not os.path.exists(FICHIER_LOCAL_DVF_PLUS):
     gdown.download(id=FILE_DVF_PLUS_ID, output=FICHIER_LOCAL_DVF_PLUS, quiet=False)
 dvf_plus = pd.read_csv(FICHIER_LOCAL_DVF_PLUS, sep="|", low_memory=False)
 
-# anciennes bases 
-# pour dvf 2026
-if not os.path.exists(FICHIER_LOCAL_26):
-    gdown.download(id=FILE_ID_26, output=FICHIER_LOCAL_26, quiet=False)
-
-dvf_2026 = pd.read_csv(
-    FICHIER_LOCAL_26,
-    sep="|",            # les fichiers DVF sont séparés par des barres verticales
-    decimal=",",        # montants avec virgule décimale
-    low_memory=False,
-    encoding="utf-8",   # essaie "latin-1" si les accents sont cassés
-)
-#visualisation 
-print(dvf_2026.shape)
-print(dvf_2026.head())
-
-#pour dvf 2025
-if not os.path.exists(FICHIER_LOCAL_25):
-    gdown.download(id=FILE_ID_25, output=FICHIER_LOCAL_25, quiet=False)
-
-dvf_2025 = pd.read_csv(
-    FICHIER_LOCAL_25,
-    sep="|",            
-    decimal=",",        
-    low_memory=False,
-    encoding="utf-8",   
-)
-#visualisation 
-print(dvf_2025.shape)
-print(dvf_2025.head())
 
 #############################’#############################################################
 #                                                                                        #
@@ -91,24 +55,25 @@ print(dvf_2025.head())
 
 ############################on ne conserve que Paris centre (75) #########################
 ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").str.startswith("75")]
-dvf_2026 = dvf_2026[dvf_2026["Code departement"] == "75"]
-dvf_2025 = dvf_2025[dvf_2025["Code departement"] == "75"]
 
 ############################ sélection des ventes pour dvf ###############################
 #1. on selectionnes les ventes d'un appartement seul 
-# Les dependances (caves, parkings...) sont autorisees ici.
-dvf_plus = dvf_plus[dvf_plus['anneemut'].between(2023, 2025)]
-dvf_plus = dvf_plus[dvf_plus['libnatmut'] == 'Vente']
-dvf_plus = dvf_plus[dvf_plus['nblocapt'] == 1]
-dvf_plus = dvf_plus[dvf_plus['nblocmai'] == 0]
-dvf_plus = dvf_plus[dvf_plus['nblocact'] == 0]
+# On garde les dépendances pr le moment (on fait deux bases à la fin)
+dvf_plus = dvf_plus[dvf_plus['anneemut'].between(2023, 2025)] #année de mutation
+dvf_plus = dvf_plus[dvf_plus['libnatmut'] == 'Vente'] #on ne garde que les ventes (on exclut "vente en l'état futur d'achèvement" et "échange")
+dvf_plus = dvf_plus[dvf_plus['nblocapt'] == 1] # nombre d'appartements ayant muté 
+dvf_plus = dvf_plus[dvf_plus['nblocmai'] == 0] # nombre de maisons ayant muté 
+dvf_plus = dvf_plus[dvf_plus['nblocact'] == 0] # nombre de locaux d'activité ayant muté
 dvf_plus = dvf_plus[dvf_plus['codtypbien'] == 121]  # Un appartement, selon cette livraison
 
 #2. on évite les ventes complexes (plusieurs communes, dispositions ou parcelles)
-dvf_plus = dvf_plus[dvf_plus['nbcomm'] == 1]
-dvf_plus = dvf_plus[dvf_plus['nbdispo'] == 1]
-dvf_plus = dvf_plus[dvf_plus['nbpar'] == 1]
+dvf_plus = dvf_plus[dvf_plus['nbcomm'] == 1] # nombre de communes 
+dvf_plus = dvf_plus[dvf_plus['nbdispo'] == 1] # nombre de dispositions associées à la mutation (98% des mutations ont une seule disposition)
+dvf_plus = dvf_plus[dvf_plus['nbpar'] == 1] # nombre de parcelles 
 
+
+# remarque : une mutation peut comprendre un mélange des biens suivants : une parcelle nue / un local / un volume
+# Le code idmutation est présent dans toutes les tables de DV3F et permet d’effectuer très simplement des jointures entre celles-ci.
 
 ########################### on ne conserve que les types d'espaces verts utiles ###########
 
@@ -151,20 +116,7 @@ col_to_drop = [
                                         "ID_DIVISION", "ID_ATELIER_HORTICOLE", "IDA3D_ENB", "ID_EQPT",
                                         "Compétence","last_edited_user",
                                         "last_edited_date" ]),
-    (ev_supp, ["Type d'opération", "Secteur administratif"]),
-    (dvf_2026, ["Identifiant de document", "Reference document", "1 Articles CGI", "2 Articles CGI",
-                                        "3 Articles CGI", "4 Articles CGI", "5 Articles CGI",
-                                        "No disposition", "B/T/Q", "Commune", "Code commune",
-                                        "Prefixe de section", "No plan", "No Volume",
-                                        "Identifiant local", "Nature culture speciale"]),
-                                        
-    (dvf_2025, ["Identifiant de document", "Reference document", "1 Articles CGI", "2 Articles CGI",
-                                        "3 Articles CGI", "4 Articles CGI", "5 Articles CGI",
-                                        "No disposition", "B/T/Q", "Commune", "Code commune",
-                                        "Prefixe de section", "No plan", "No Volume",
-                                        "Identifiant local", "Nature culture speciale"]) ]
-
-    
+    (ev_supp, ["Type d'opération", "Secteur administratif"]) ]
 
 for df, cols in col_to_drop:
     df.drop(columns=cols, inplace=True)
@@ -175,13 +127,7 @@ for df, cols in col_to_drop:
 col_to_integer = [
     (ev_actuels, ["Adresse - Numéro", "Code postal", "Surface calculée", "Superficie totale réelle",
             "Surface horticole", "Année de l'ouverture"]),
-    (ev_supp, ["M2 d’espaces verts supplémentaires"]),
-    (dvf_2026, ["No voie", "Code postal",
-            "Code type local", "Surface reelle bati", "Nombre pieces principales",
-            "Surface terrain"]),
-    (dvf_2025, ["No voie", "Code postal",
-            "Code type local", "Surface reelle bati", "Nombre pieces principales",
-            "Surface terrain"])
+    (ev_supp, ["M2 d’espaces verts supplémentaires"])
 ]
 
 for df, cols in col_to_integer:
@@ -190,15 +136,13 @@ for df, cols in col_to_integer:
 
 #print(ev_actuels.info())
 #print(ev_supp.info())
-#print(dvf_2026.info())
-print(dvf_2025.info())
+
 ############################## harmonisation des valeurs nulles ou NAN #####################
 
 # on détecte les valeurs qui correspondent à des NaN (certains 0 sont des NaN, d'autres sont des valeurs réelles)
 #print(ev_actuels.describe())
 #print(ev_supp.describe())
-#print(dvf_2026.describe())
-print(dvf_2025.describe())
+
 col_zero_to_nan = [(ev_actuels, ["Adresse - Numéro"])]
 col_val_to_nan = [(ev_actuels, ["Année de l'ouverture"])]
 
@@ -214,10 +158,10 @@ for df, cols in col_val_to_nan:
 necessaires = ['valeurfonc', 'sbatapt', 'geompar_x', 'geompar_y']
 dvf_plus = dvf_plus.dropna(subset=necessaires).copy()
 dvf_plus = dvf_plus[dvf_plus['valeurfonc'] > 0].copy()
-dvf_plus = dvf_plus[dvf_plus['sbatapt'].between(9, 300)].copy()
+dvf_plus = dvf_plus[dvf_plus['sbatapt'] > 9].copy() # chat voulait limiter à 300 m2 ??
 
-dvf_plus['prix_m2'] = dvf_plus['valeurfonc'] / dvf_plus['sbatapt']
-dvf_plus = dvf_plus[dvf_plus['prix_m2'].between(1000, 30000)].copy()
+dvf_plus['prix_m2'] = dvf_plus['valeurfonc'] / dvf_plus['sbatapt'] # on rajoute une colonne px_m2
+# dvf_plus = dvf_plus[dvf_plus['prix_m2'].between(1000, 30000)].copy() pk limiter le prix au m2 ??
 
 ############################ création des variables utiles pour la régression ############
 dvf_plus['avec_dependance'] = (dvf_plus['nblocdep'] > 0).astype(int)
@@ -263,14 +207,12 @@ assert dvf_plus['prix_m2'].gt(0).all(), 'Attention : prix au m2 invalide'
 #                                                                                        #                      
 ##########################################################################################
 
-# enregistrement de dvf_plus 
+# enregistrement des données 
 dvf_plus.to_csv('dvf_paris_nettoyee.csv', index=False)
 # version sans dépendances 
 sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
 sans_dependances.to_csv('dvf_paris_sans_dependances.csv', index=False)
+ev_actuels.to_csv('espaces_verts_actuels_nettoyes.csv', index=False)
+ev_supp.to_csv('espaces_verts_supplementaires_nettoyes.csv', index=False)
 
-print('Ventes conservees :', len(dvf_plus))
-print('Sans dependances :', len(sans_dependances))
-print('Ventes par annee :')
-print(df['annee'].value_counts().sort_index())
 print('Fichiers CSV crees.')
