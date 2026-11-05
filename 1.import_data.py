@@ -6,6 +6,9 @@
 ##########################################################################################
 
 import numpy as np 
+import json 
+import geopandas as gpd
+from shapely.geometry import shape
 import pandas as pd
 import gdown
 import os
@@ -26,28 +29,24 @@ FICHIER_LOCAL_DVF_PLUS = "dvf_plus_d75.csv"
 #                                                                                        #                      
 ##########################################################################################
 
-
-
 ######################## espaces verts actuels et supplémentaires ########################
 
-ev_actuels = pd.read_csv("data/espaces_verts.csv", sep=";", encoding="utf-8")
-ev_supp = pd.read_csv("data/espaces_verts_supplementaires.csv", sep=";", encoding="utf-8")
+ev_actuels = pd.read_csv("data/1.data_brute/espaces_verts.csv", sep=";", encoding="utf-8")
+ev_supp = pd.read_csv("data/1.data_brute/espaces_verts_supplementaires.csv", sep=";", encoding="utf-8")
 
 # visualisation 
 print(ev_actuels.head(10))
 print(ev_supp.head(10))
 
-#################################### données foncières ###################################
+#################################### données foncières (2023-2025) ###################################
 # fichiers volumineux donc télécharge automatiquement en local à partir du drive partagé (mettre noms dans le gitignore)
 # Téléchargement uniquement si le fichier n'existe pas déjà
 
-# dvf + : ventes d'appartement sur 2023 -2025
 if not os.path.exists(FICHIER_LOCAL_DVF_PLUS):
     gdown.download(id=FILE_DVF_PLUS_ID, output=FICHIER_LOCAL_DVF_PLUS, quiet=False)
 dvf_plus = pd.read_csv(FICHIER_LOCAL_DVF_PLUS, sep="|", low_memory=False)
 
-
-#############################’#############################################################
+#############################’############################################################
 #                                                                                        #
 #                                  nettoyage des données                                 #
 #                                                                                        #                      
@@ -57,6 +56,7 @@ dvf_plus = pd.read_csv(FICHIER_LOCAL_DVF_PLUS, sep="|", low_memory=False)
 ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").str.startswith("75")]
 
 ############################ sélection des ventes pour dvf ###############################
+
 #1. on selectionnes les ventes d'un appartement seul 
 # On garde les dépendances pr le moment (on fait deux bases à la fin)
 dvf_plus = dvf_plus[dvf_plus['anneemut'].between(2023, 2025)] #année de mutation
@@ -164,6 +164,7 @@ dvf_plus['prix_m2'] = dvf_plus['valeurfonc'] / dvf_plus['sbatapt'] # on rajoute 
 # dvf_plus = dvf_plus[dvf_plus['prix_m2'].between(1000, 30000)].copy() pk limiter le prix au m2 ??
 
 ############################ création des variables utiles pour la régression ############
+
 dvf_plus['avec_dependance'] = (dvf_plus['nblocdep'] > 0).astype(int)
 dvf_plus['nb_pieces'] = (
     dvf_plus['nbapt1pp'] + 2 * dvf_plus['nbapt2pp'] + 3 * dvf_plus['nbapt3pp']
@@ -172,6 +173,34 @@ dvf_plus['nb_pieces'] = (
 
 dvf_plus['log_prix_m2'] = np.log(dvf_plus['prix_m2'])
 dvf_plus['log_surface'] = np.log(dvf_plus['sbatapt'])
+
+######################### création des deux couches géométriques #########################
+
+# on transforme les deux tableaux en couches géographiques (GeoDataFrames) pour pouvoir les croiser spatialement
+# tout en convertissant ev_actuels en Lambert93 
+
+# --- Espaces verts : polygones en WGS84 --
+
+ev = ev_actuels.dropna(subset=["Geo Shape"]).copy() #on enlève les lignes sans géométrie (il en reste 762)
+
+#1. création colonne geometry avec pr chaque ligne : Geoshape contient le contour sous forme JSON, transformé en dictionnaire par json.loads (issinstance laisse passer les valeurs qui sont déjà des dictionnaires)
+# shape convertit le dictionnaire en polygone utilisable par geopandas 
+ev["geometry"] = ev["Geo Shape"].apply(
+    lambda s: shape(json.loads(s) if isinstance(s, str) else s) 
+)
+
+#2. on crée le Geodataframe en indiquant quelle colonne contient la géométrie avec to_crs qui convertit en Lambert93
+gdf_ev = gpd.GeoDataFrame(ev, geometry="geometry", crs="EPSG:4326").to_crs("EPSG:2154")
+
+# --- DVF : points en Lambert 93 ---
+dvf = dvf_plus.dropna(subset=["geompar_x", "geompar_y"]).copy() #garde seulement les ventes qui ont des coordonnées 
+gdf_dvf = gpd.GeoDataFrame(
+    dvf,
+    geometry=gpd.points_from_xy(dvf["geompar_x"], dvf["geompar_y"]), #points_from_xy crée un point pour chaque vente à partir de ses coordonnées x et y 
+    crs="EPSG:2154", # déclare que les coordonnées sont en Lambert93 (EPSG:2154) : pas de conversion
+)
+
+# CONCLUSION : gdf_ev contient des polygones et gdf_dvf des points. Ils peuvent donc être croisés et les distances sont en mètres
 
 ############################ harmonisation des noms de colonnes ##########################
 # pr dvf : on garde les variables intéressantes et on donne des noms simples 
