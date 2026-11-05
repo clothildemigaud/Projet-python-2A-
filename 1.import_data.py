@@ -10,7 +10,7 @@ import pandas as pd
 import gdown
 import os
 
-os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
+#os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
 
 #pour voir toutes les colonnes dans les sorties python
 pd.set_option("display.max_columns", None)  
@@ -208,11 +208,11 @@ assert dvf_plus['prix_m2'].gt(0).all(), 'Attention : prix au m2 invalide'
 ##########################################################################################
 
 # enregistrement des données 
-dvf_plus.to_csv('dvf_paris_nettoyee.csv', index=False)
+dvf_plus.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_nettoyee.csv'), index=False)
 # version sans dépendances 
 sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
-sans_dependances.to_csv('dvf_paris_sans_dependances.csv', index=False)
-ev_actuels.to_csv('espaces_verts_actuels_nettoyes.csv', index=False)
-ev_supp.to_csv('espaces_verts_supplementaires_nettoyes.csv', index=False)
+sans_dependances.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_sans_dependances.csv'), index=False)
+ev_actuels.to_csv(os.path.join("data/2.data_nettoyee", 'espaces_verts_actuels_nettoyes.csv'), index=False)
+ev_supp.to_csv(os.path.join("data/2.data_nettoyee", 'espaces_verts_supplementaires_nettoyes.csv'), index=False)
 
 print('Fichiers CSV crees.')
