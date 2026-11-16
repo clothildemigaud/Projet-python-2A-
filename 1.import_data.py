@@ -174,34 +174,6 @@ dvf_plus['nb_pieces'] = (
 dvf_plus['log_prix_m2'] = np.log(dvf_plus['prix_m2'])
 dvf_plus['log_surface'] = np.log(dvf_plus['sbatapt'])
 
-######################### création des deux couches géométriques #########################
-
-# on transforme les deux tableaux en couches géographiques (GeoDataFrames) pour pouvoir les croiser spatialement
-# tout en convertissant ev_actuels en Lambert93 
-
-# --- Espaces verts : polygones en WGS84 --
-
-ev = ev_actuels.dropna(subset=["Geo Shape"]).copy() #on enlève les lignes sans géométrie (il en reste 762)
-
-#1. création colonne geometry avec pr chaque ligne : Geoshape contient le contour sous forme JSON, transformé en dictionnaire par json.loads (issinstance laisse passer les valeurs qui sont déjà des dictionnaires)
-# shape convertit le dictionnaire en polygone utilisable par geopandas 
-ev["geometry"] = ev["Geo Shape"].apply(
-    lambda s: shape(json.loads(s) if isinstance(s, str) else s) 
-)
-
-#2. on crée le Geodataframe en indiquant quelle colonne contient la géométrie avec to_crs qui convertit en Lambert93
-gdf_ev = gpd.GeoDataFrame(ev, geometry="geometry", crs="EPSG:4326").to_crs("EPSG:2154")
-
-# --- DVF : points en Lambert 93 ---
-dvf = dvf_plus.dropna(subset=["geompar_x", "geompar_y"]).copy() #garde seulement les ventes qui ont des coordonnées 
-gdf_dvf = gpd.GeoDataFrame(
-    dvf,
-    geometry=gpd.points_from_xy(dvf["geompar_x"], dvf["geompar_y"]), #points_from_xy crée un point pour chaque vente à partir de ses coordonnées x et y 
-    crs="EPSG:2154", # déclare que les coordonnées sont en Lambert93 (EPSG:2154) : pas de conversion
-)
-
-# CONCLUSION : gdf_ev contient des polygones et gdf_dvf des points. Ils peuvent donc être croisés et les distances sont en mètres
-
 ############################ harmonisation des noms de colonnes ##########################
 # pr dvf : on garde les variables intéressantes et on donne des noms simples 
 colonnes = {
@@ -228,6 +200,58 @@ dvf_plus = dvf_plus.sort_values(['date', 'id_vente']).reset_index(drop=True)
 # 7. Verifications 
 assert dvf_plus['id_vente'].is_unique, 'Attention : ventes en double'
 assert dvf_plus['prix_m2'].gt(0).all(), 'Attention : prix au m2 invalide'
+
+
+######################### création des deux couches géométriques #########################
+
+# on transforme les deux tableaux en couches géographiques (GeoDataFrames) pour pouvoir les croiser spatialement
+# tout en convertissant ev_actuels en Lambert93 
+
+# --- Espaces verts : polygones en WGS84 --
+
+ev_actuels.dropna(subset=["Geo Shape"]) #on enlève les lignes sans géométrie (il en reste 762)
+
+#1. création colonne geometry avec pr chaque ligne : Geoshape contient le contour sous forme JSON, transformé en dictionnaire par json.loads (issinstance laisse passer les valeurs qui sont déjà des dictionnaires)
+# shape convertit le dictionnaire en polygone utilisable par geopandas 
+ev_actuels["geometry"] = ev_actuels["Geo Shape"].apply(
+    lambda s: shape(json.loads(s) if isinstance(s, str) else s) 
+)
+
+#2. on crée le Geodataframe en indiquant quelle colonne contient la géométrie avec to_crs qui convertit en Lambert93
+gdf_ev = gpd.GeoDataFrame(ev_actuels, geometry="geometry", crs="EPSG:4326").to_crs("EPSG:2154")
+
+# --- DVF : points en Lambert 93 ---
+dvf_plus.dropna(subset=["x_lambert93", "y_lambert93"]) #garde seulement les ventes qui ont des coordonnées 
+gdf_dvf = gpd.GeoDataFrame(
+    dvf_plus,
+    geometry=gpd.points_from_xy(dvf_plus["x_lambert93"], dvf_plus["y_lambert93"]), #points_from_xy crée un point pour chaque vente à partir de ses coordonnées x et y 
+    crs="EPSG:2154", # déclare que les coordonnées sont en Lambert93 (EPSG:2154) : pas de conversion
+)
+
+# CONCLUSION : gdf_ev contient des polygones et gdf_dvf des points. Ils peuvent donc être croisés et les distances sont en mètres
+
+############## calcul de la distance de chaque logement à l'espace vert le plus proche ########
+# Identifiant de chaque espace vert (son index d'origine dans ev_actuels)
+gdf_ev["id_ev"] = gdf_ev.index
+
+proche = gpd.sjoin_nearest(
+    gdf_dvf[["geometry"]],
+    gdf_ev[["id_ev", "Typologie d'espace vert","Nom de l'espace vert", "Catégorie", "geometry"]],
+    how="left",
+    distance_col="dist_ev_m",
+)
+
+# Une seule ligne par logement (en cas d'égalité de distance)
+proche = proche[~proche.index.duplicated(keep="first")]
+
+# Ajout à dvf_plus (affectation par index, NaN pour les logements sans coordonnées)
+dvf_plus["id_ev_proche"] = proche["id_ev"]
+dvf_plus["typologie_ev_proche"] = proche["Typologie d'espace vert"]
+dvf_plus["categorie_ev_proche"] = proche["Catégorie"]
+dvf_plus["dist_ev_m"] = proche["dist_ev_m"]
+dvf_plus["nom_ev_proche"] = proche["Nom de l'espace vert"]
+
+
 
 
 ##########################################################################################
