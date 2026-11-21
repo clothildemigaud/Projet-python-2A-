@@ -59,6 +59,7 @@ ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").str.startswit
 
 #1. on selectionnes les ventes d'un appartement seul 
 # On garde les dépendances pr le moment (on fait deux bases à la fin)
+# on ne garde pas les maisons car trop peu nombreuses et prix dépend pas que de la surface 
 dvf_plus = dvf_plus[dvf_plus['anneemut'].between(2023, 2025)] #année de mutation
 dvf_plus = dvf_plus[dvf_plus['libnatmut'] == 'Vente'] #on ne garde que les ventes (on exclut "vente en l'état futur d'achèvement" et "échange")
 dvf_plus = dvf_plus[dvf_plus['nblocapt'] == 1] # nombre d'appartements ayant muté 
@@ -231,26 +232,64 @@ gdf_dvf = gpd.GeoDataFrame(
 # CONCLUSION : gdf_ev contient des polygones et gdf_dvf des points. Ils peuvent donc être croisés et les distances sont en mètres
 
 ############## calcul de la distance de chaque logement à l'espace vert le plus proche ########
-# Identifiant de chaque espace vert (son index d'origine dans ev_actuels)
-gdf_ev["id_ev"] = gdf_ev.index
+### à modifier pour ne prendre en compte que les espaces verts avec une taille suffisante , et vérifier que accessibles au public
 
-proche = gpd.sjoin_nearest(
+#1 On ne garde que les espaces verts de taille suffisante 
+gdf_ev = gdf_ev[gdf_ev["Surface calculée"] >= 50]
+gdf_ev["id_ev"] = gdf_ev.index  # on crée un identifiant unique pour chaque espace vert
+
+#jointure spatiale 
+ev_proche_1 = gpd.sjoin_nearest(
     gdf_dvf[["geometry"]],
-    gdf_ev[["id_ev", "Typologie d'espace vert","Nom de l'espace vert", "Catégorie", "geometry"]],
+    gdf_ev[["id_ev", "Typologie d'espace vert","Nom de l'espace vert", "Catégorie", "geometry", "Surface calculée"]],
     how="left",
     distance_col="dist_ev_m",
 )
 
+RAYONS = [100, 200, 300]
+# 300m = 4m à pied, distance recommandée par l'OMS Europe 
+# 500 m = 6 min à pied 
+# 1000 m = 12 min à pied (distances à vol d'oiseau, sous estiment le trajet réel à pied)
+
+ev_g = gdf_ev[["id_ev", "Nom de l'espace vert", "geometry"]].copy()
+ev_g["nom"] = ev_g["Nom de l'espace vert"].fillna("Sans nom")
+
+# 1. tous les couples (logement, espace vert) à moins de 1 000 m
+zone = gdf_dvf[["geometry"]].copy()
+zone["geometry"] = zone.geometry.buffer(max(RAYONS))
+paires = gpd.sjoin(zone, ev_g, how="inner", predicate="intersects")
+
+# 2. distance exacte de chaque couple (le point du polygone le plus proche)
+paires["dist_m"] = gdf_dvf.geometry.loc[paires.index].distance(
+    ev_g.geometry.loc[paires["index_right"]], align=False
+)
+
+# 3. une colonne par rayon : dictionnaire {nom: distance}, et le nombre d'espaces verts
+for r in RAYONS:
+    p = paires[paires["dist_m"] <= r]
+
+    # distance minimale par (logement, nom) : un parc découpé = une seule entrée
+    d = p.groupby([p.index, "nom"])["dist_m"].min().reset_index()
+    d.columns = ["idx", "nom", "dist"]
+    d = d.sort_values(["idx", "dist"])
+
+    # dictionnaire {nom: distance} par logement, trié par distance croissante
+    dicts = {}
+    for idx, nom, dist in zip(d["idx"], d["nom"], d["dist"]):
+        dicts.setdefault(idx, {})[nom] = int(round(dist))
+
+    dvf_plus[f"ev_{r}m"] = [dicts.get(i, {}) for i in dvf_plus.index]
+    dvf_plus[f"nb_ev_{r}m"] = dvf_plus[f"ev_{r}m"].apply(len)
 # Une seule ligne par logement (en cas d'égalité de distance)
-proche = proche[~proche.index.duplicated(keep="first")]
+ev_proche_1 = ev_proche_1[~ev_proche_1.index.duplicated(keep="first")]
 
 # Ajout à dvf_plus (affectation par index, NaN pour les logements sans coordonnées)
-dvf_plus["id_ev_proche"] = proche["id_ev"]
-dvf_plus["typologie_ev_proche"] = proche["Typologie d'espace vert"]
-dvf_plus["categorie_ev_proche"] = proche["Catégorie"]
-dvf_plus["dist_ev_m"] = proche["dist_ev_m"]
-dvf_plus["nom_ev_proche"] = proche["Nom de l'espace vert"]
-
+dvf_plus["id_ev_proche"] = ev_proche_1["id_ev"]
+dvf_plus["typologie_ev_proche"] = ev_proche_1["Typologie d'espace vert"]
+dvf_plus["categorie_ev_proche"] = ev_proche_1["Catégorie"]
+dvf_plus["dist_ev_m"] = ev_proche_1["dist_ev_m"]
+dvf_plus["nom_ev_proche"] = ev_proche_1["Nom de l'espace vert"]
+dvf_plus["surface_ev_proche"] = ev_proche_1["Surface calculée"]
 
 
 
