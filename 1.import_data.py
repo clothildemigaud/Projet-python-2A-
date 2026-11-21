@@ -99,6 +99,8 @@ categories_to_keep = [ 'Jardin',
  'Foret urbaine',
  'Terrain de boules',
  'jardiniere',
+ 'Jardiniere',
+ 'Cimetière'
  'Bois',
  'Ile']
 types_to_keep = ["Bois", "Ephémères, partagés, pédagogiques", "Jardinets décoratifs", "Promenades ouvertes",
@@ -210,16 +212,16 @@ assert dvf_plus['prix_m2'].gt(0).all(), 'Attention : prix au m2 invalide'
 
 # --- Espaces verts : polygones en WGS84 --
 
-ev_actuels.dropna(subset=["Geo Shape"]) #on enlève les lignes sans géométrie (il en reste 762)
+ev = ev_actuels.dropna(subset=["Geo Shape"]).copy() #on enlève les lignes sans géométrie (il en reste 762)
 
 #1. création colonne geometry avec pr chaque ligne : Geoshape contient le contour sous forme JSON, transformé en dictionnaire par json.loads (issinstance laisse passer les valeurs qui sont déjà des dictionnaires)
 # shape convertit le dictionnaire en polygone utilisable par geopandas 
-ev_actuels["geometry"] = ev_actuels["Geo Shape"].apply(
+ev["geometry"] = ev["Geo Shape"].apply(
     lambda s: shape(json.loads(s) if isinstance(s, str) else s) 
 )
 
 #2. on crée le Geodataframe en indiquant quelle colonne contient la géométrie avec to_crs qui convertit en Lambert93
-gdf_ev = gpd.GeoDataFrame(ev_actuels, geometry="geometry", crs="EPSG:4326").to_crs("EPSG:2154")
+gdf_ev = gpd.GeoDataFrame(ev, geometry="geometry", crs="EPSG:4326").to_crs("EPSG:2154")
 
 # --- DVF : points en Lambert 93 ---
 dvf_plus.dropna(subset=["x_lambert93", "y_lambert93"]) #garde seulement les ventes qui ont des coordonnées 

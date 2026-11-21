@@ -1,2 +1,20 @@
-##### fusion de colonnes 
-# adresse et surface pour les espaces verts actuels 
+##########################################################################################
+#                                                                                        #
+#                                  import packages et paramètres                         #
+#                                                                                        #                      
+##########################################################################################
+
+import numpy as np 
+import json 
+import geopandas as gpd
+from shapely.geometry import shape
+import pandas as pd
+import gdown
+import os
+
+##########################################################################################
+#                                                                                        #
+#                                  import data nettoyée                                  #
+#                                                                                        #                      
+##########################################################################################
+
