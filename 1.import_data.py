@@ -235,7 +235,7 @@ gdf_dvf = gpd.GeoDataFrame(
 ### à modifier pour ne prendre en compte que les espaces verts avec une taille suffisante , et vérifier que accessibles au public
 
 #1 On ne garde que les espaces verts de taille suffisante 
-gdf_ev = gdf_ev[gdf_ev["Surface calculée"] >= 50]
+gdf_ev = gdf_ev[gdf_ev["Surface calculée"] >= 80]
 gdf_ev["id_ev"] = gdf_ev.index  # on crée un identifiant unique pour chaque espace vert
 
 #jointure spatiale 
@@ -251,7 +251,7 @@ RAYONS = [100, 200, 300]
 # 500 m = 6 min à pied 
 # 1000 m = 12 min à pied (distances à vol d'oiseau, sous estiment le trajet réel à pied)
 
-ev_g = gdf_ev[["id_ev", "Nom de l'espace vert", "geometry"]].copy()
+ev_g = gdf_ev[["id_ev", "Nom de l'espace vert", "geometry", "Surface calculée"]].copy()
 ev_g["nom"] = ev_g["Nom de l'espace vert"].fillna("Sans nom")
 
 # 1. tous les couples (logement, espace vert) à moins de 1 000 m
@@ -268,18 +268,24 @@ paires["dist_m"] = gdf_dvf.geometry.loc[paires.index].distance(
 for r in RAYONS:
     p = paires[paires["dist_m"] <= r]
 
-    # distance minimale par (logement, nom) : un parc découpé = une seule entrée
-    d = p.groupby([p.index, "nom"])["dist_m"].min().reset_index()
-    d.columns = ["idx", "nom", "dist"]
+    # distance minimale par (logement, nom), un parc découpé en plusieurs polygones = une seule entrée (distance minimale, surface du parc)
+    d = (p.groupby([p.index, "nom"])
+           .agg(dist=("dist_m", "min"), surface=("Surface calculée", "max"))
+           .reset_index())
+    d.columns = ["idx", "nom", "dist", "surface"]
     d = d.sort_values(["idx", "dist"])
 
-    # dictionnaire {nom: distance} par logement, trié par distance croissante
+    # dictionnaire {nom: {"dist_m": ..., "surface_m2": ...}} par logement, trié par distance
     dicts = {}
-    for idx, nom, dist in zip(d["idx"], d["nom"], d["dist"]):
-        dicts.setdefault(idx, {})[nom] = int(round(dist))
+    for idx, nom, dist, surf in zip(d["idx"], d["nom"], d["dist"], d["surface"]):
+        dicts.setdefault(idx, {})[nom] = {
+            "dist_m": int(round(dist)),
+            "surface_m2": None if pd.isna(surf) else int(round(surf)),
+        }
 
     dvf_plus[f"ev_{r}m"] = [dicts.get(i, {}) for i in dvf_plus.index]
     dvf_plus[f"nb_ev_{r}m"] = dvf_plus[f"ev_{r}m"].apply(len)
+    
 # Une seule ligne par logement (en cas d'égalité de distance)
 ev_proche_1 = ev_proche_1[~ev_proche_1.index.duplicated(keep="first")]
 
@@ -304,7 +310,7 @@ dvf_plus.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_nettoyee.csv'), 
 # version sans dépendances 
 sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
 sans_dependances.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_sans_dependances.csv'), index=False)
-ev_actuels.to_csv(os.path.join("data/2.data_nettoyee", 'espaces_verts_actuels_nettoyes.csv'), index=False)
-ev_supp.to_csv(os.path.join("data/2.data_nettoyee", 'espaces_verts_supplementaires_nettoyes.csv'), index=False)
+ev_actuels.to_csv(os.path.join("data/2.data_nettoyee", 'ev_actuels_nettoyes.csv'), index=False)
+ev_supp.to_csv(os.path.join("data/2.data_nettoyee", 'ev_supp_nettoyes.csv'), index=False)
 
 print('Fichiers CSV crees.')
