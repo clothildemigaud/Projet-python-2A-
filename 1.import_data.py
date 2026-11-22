@@ -323,9 +323,8 @@ dvf_plus["nom_ev_proche"] = ev_proche_1["Nom de l'espace vert"]
 dvf_plus["surface_ev_proche"] = ev_proche_1["Surface calculée"]
 
 ############## calcul de la surface des parcs et jardins publics  ########
-parcs_publics["surface_ha"] = parcs_publics.geometry.area
+parcs_publics_nettoyee["surface_m2"] = parcs_publics_nettoyee.geometry.area
 
-#print(parcs_publics[["nom", "nature", "surface_ha"]].head())
 ##########################################################################################
 #                                                                                        #
 #                         Enregistrement des données nettoyées                           #
@@ -334,9 +333,11 @@ parcs_publics["surface_ha"] = parcs_publics.geometry.area
 
 # enregistrement des données 
 dvf_plus.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_nettoyee.csv'), index=False)
-# version sans dépendances 
-sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
-sans_dependances.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_sans_dependances.csv'), index=False)
 ev_actuels.to_csv(os.path.join("data/2.data_nettoyee", 'ev_actuels_nettoyes.csv'), index=False)
 ev_supp.to_csv(os.path.join("data/2.data_nettoyee", 'ev_supp_nettoyes.csv'), index=False)
 parcs_publics_nettoyee.to_file("data/2.data_nettoyee/parcs_publics_nettoyee.gpkg", layer="parcs_publics_nettoyee", driver="GPKG")
+# version sans dépendances 
+sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
+sans_dependances.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_sans_dependances.csv'), index=False)
+
+print(list(dvf_plus.columns))
