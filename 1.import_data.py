@@ -44,7 +44,7 @@ parcs_publics = gpd.read_file("data/1.data_brute/PJ_75_2021.gpkg")
 print(parcs_publics.info())
 
 #################################### données foncières (2023-2025) ###################################
-# fichiers volumineux donc télécharge automatiquement en local à partir du drive partagé (mettre noms dans le gitignore)
+# fichiers volumineux donc télécharge automatiquement en local à partir du drive partagé (mettre nom dans le gitignore)
 # Téléchargement uniquement si le fichier n'existe pas déjà
 
 if not os.path.exists(FICHIER_LOCAL_DVF_PLUS):
@@ -187,7 +187,7 @@ dvf_plus = dvf_plus[dvf_plus['valeurfonc'] > 0].copy()
 dvf_plus = dvf_plus[dvf_plus['sbatapt'] > 9].copy() # chat voulait limiter à 300 m2 ??
 
 dvf_plus['prix_m2'] = dvf_plus['valeurfonc'] / dvf_plus['sbatapt'] # on rajoute une colonne px_m2
-# dvf_plus = dvf_plus[dvf_plus['prix_m2'].between(1000, 30000)].copy() pk limiter le prix au m2 ??
+dvf_plus = dvf_plus[dvf_plus['prix_m2'].between(1000, 30000)].copy()                                      
 
 ############################ création des variables utiles pour la régression ############
 
@@ -339,4 +339,4 @@ sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
 sans_dependances.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_sans_dependances.csv'), index=False)
 ev_actuels.to_csv(os.path.join("data/2.data_nettoyee", 'ev_actuels_nettoyes.csv'), index=False)
 ev_supp.to_csv(os.path.join("data/2.data_nettoyee", 'ev_supp_nettoyes.csv'), index=False)
-
+parcs_publics_nettoyee.to_file("data/2.data_nettoyee/parcs_publics_nettoyee.gpkg", layer="parcs_publics_nettoyee", driver="GPKG")
