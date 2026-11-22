@@ -145,3 +145,8 @@ resultats = pd.DataFrame(lignes)
 print(f"{len(base)} ventes et {len(parcs)} parcs, jardins et squares.")
 print(resultats.round(4).to_string(index=False))
 resultats.to_csv(dossier / "resultats_regressions.csv", index=False)
+
+# penser à analyser les résultats dans le notebook 
+# peut être comparer aux résultats d'études sur le sujet : par ex https://www.defiscalisation.immo/informations/parc-jardin-les-exterieurs-font-grimper-le-prix-des-logements/
+# soutient que un appartement (dans toute la france) qui dispose d'un parc à 10-15 min voit son prix augmenter de 1.1% en moyenne / 8% quand moins de 5 min 
+# + évoque le fait que à Paris, la proximité joue surtout sur l'acte d'achat 
