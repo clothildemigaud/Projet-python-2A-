@@ -13,7 +13,7 @@ import pandas as pd
 import gdown
 import os
 
-#os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
+os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
 
 #pour voir toutes les colonnes dans les sorties python
 pd.set_option("display.max_columns", None)  
@@ -38,6 +38,11 @@ ev_supp = pd.read_csv("data/1.data_brute/espaces_verts_supplementaires.csv", sep
 print(ev_actuels.head(10))
 print(ev_supp.head(10))
 
+######################## Parcs et Jardins ouverts au public ########################
+
+parcs_publics = gpd.read_file("data/1.data_brute/PJ_75_2021.gpkg")
+print(parcs_publics.info())
+
 #################################### données foncières (2023-2025) ###################################
 # fichiers volumineux donc télécharge automatiquement en local à partir du drive partagé (mettre noms dans le gitignore)
 # Téléchargement uniquement si le fichier n'existe pas déjà
@@ -54,6 +59,24 @@ dvf_plus = pd.read_csv(FICHIER_LOCAL_DVF_PLUS, sep="|", low_memory=False)
 
 ############################on ne conserve que Paris centre (75) #########################
 ev_actuels = ev_actuels[ev_actuels["Code postal"].astype("string").str.startswith("75")]
+
+############################ on refusionne les parcs séparés en sous-parties #########################
+
+# Nombre d'occurrences de chaque nom
+occurrences = parcs_publics["nom"].value_counts()
+
+# Liste des noms espaces à fusionner
+noms_a_fusionner = occurrences[occurrences > 1].index
+
+# Séparer les espaces à fusionner des autres
+a_fusionner = parcs_publics[parcs_publics["nom"].isin(noms_a_fusionner)]
+a_conserver = parcs_publics[~parcs_publics["nom"].isin(noms_a_fusionner)]
+
+# Fusionner les géométries
+fusionnes = a_fusionner.dissolve(by="nom", as_index=False)
+
+# Reconstituer la base
+parcs_publics_nettoyee = gpd.GeoDataFrame(pd.concat([fusionnes, a_conserver], ignore_index=True), crs=parcs_publics.crs)
 
 ############################ sélection des ventes pour dvf ###############################
 
@@ -299,8 +322,10 @@ dvf_plus["dist_ev_m"] = ev_proche_1["dist_ev_m"]
 dvf_plus["nom_ev_proche"] = ev_proche_1["Nom de l'espace vert"]
 dvf_plus["surface_ev_proche"] = ev_proche_1["Surface calculée"]
 
+############## calcul de la surface des parcs et jardins publics  ########
+parcs_publics["surface_ha"] = parcs_publics.geometry.area
 
-
+#print(parcs_publics[["nom", "nature", "surface_ha"]].head())
 ##########################################################################################
 #                                                                                        #
 #                         Enregistrement des données nettoyées                           #
@@ -315,4 +340,3 @@ sans_dependances.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_sans_dep
 ev_actuels.to_csv(os.path.join("data/2.data_nettoyee", 'ev_actuels_nettoyes.csv'), index=False)
 ev_supp.to_csv(os.path.join("data/2.data_nettoyee", 'ev_supp_nettoyes.csv'), index=False)
 
-print('Fichiers CSV crees.')
