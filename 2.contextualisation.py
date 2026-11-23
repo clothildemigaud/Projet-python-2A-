@@ -29,7 +29,6 @@ print(os.listdir("data/2.data_nettoyee"))
 ##########################################################################################
 
 ev_actuels_nettoyes = pd.read_csv("data/2.data_nettoyee/ev_actuels_nettoyes.csv", sep=",", encoding="utf-8")
-ev_supp_nettoyes = pd.read_csv("data/2.data_nettoyee/ev_supp_nettoyes.csv", sep=",", encoding="utf-8")
 dvf_x_ev = pd.read_csv("data/2.data_nettoyee/dvf_paris_sans_dependances.csv", sep=",", encoding="utf-8")
 dvf_x_ev_dep = pd.read_csv("data/2.data_nettoyee/dvf_paris_nettoyee.csv", sep=",", encoding="utf-8")
 parcs_publics_nettoyee = gpd.read_file("/home/onyxia/work/Projet-python-2A-/data/2.data_nettoyee/parcs_publics_nettoyee.gpkg", layer="parcs_publics_nettoyee")

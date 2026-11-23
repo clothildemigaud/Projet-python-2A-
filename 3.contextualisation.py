@@ -19,7 +19,7 @@ import seaborn as sns
 #pour voir toutes les colonnes dans les sorties python
 pd.set_option("display.max_columns", None)  
 
-os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
+#os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
 print(os.listdir("data/2.data_nettoyee"))
 
 ##########################################################################################
@@ -29,10 +29,10 @@ print(os.listdir("data/2.data_nettoyee"))
 ##########################################################################################
 
 ev_actuels_nettoyes = pd.read_csv("data/2.data_nettoyee/ev_actuels_nettoyes.csv", sep=",", encoding="utf-8")
-ev_supp_nettoyes = pd.read_csv("data/2.data_nettoyee/ev_supp_nettoyes.csv", sep=",", encoding="utf-8")
 dvf_x_ev = pd.read_csv("data/2.data_nettoyee/dvf_paris_sans_dependances.csv", sep=",", encoding="utf-8")
 dvf_x_ev_dep = pd.read_csv("data/2.data_nettoyee/dvf_paris_nettoyee.csv", sep=",", encoding="utf-8")
-parcs_publics_nettoyee = gpd.read_file("/home/onyxia/work/Projet-python-2A-/data/2.data_nettoyee/parcs_publics_nettoyee.gpkg", layer="parcs_publics_nettoyee")
+parcs_publics_nettoyee = gpd.read_file(
+    "data/2.data_nettoyee/parcs_publics_nettoyee.gpkg", layer="parcs_publics_nettoyee")
 
 ##########################################################################################
 #                                                                                        #
@@ -91,7 +91,7 @@ ev_3857.plot(ax=ax, color="#2e8b57", alpha=0.6, edgecolor="none", zorder = 2) # 
 fond_de_carte(ax) #on ajoute le fond de carte 
 
 # legende 
-ax.set_title("Espaces verts à Paris selon base de données") 
+ax.set_title("Espaces verts à Paris selon les données de la Ville de Paris") 
 fig.savefig("figures/carte_ev.png", dpi=200, bbox_inches="tight")
 plt.show()
 
@@ -109,7 +109,7 @@ fond_de_carte(ax) #on ajoute le fond de carte
 
 fig.colorbar(hb, ax=ax, shrink=0.6, label="Nombre de ventes par cellule")
 ax.legend(
-    handles=[Patch(facecolor="#2e8b57", alpha=0.6, label="Espaces verts")],
+    handles=[Patch(facecolor="#2e8b57", alpha=0.6, label="Espaces verts d'après données de la ville de Paris")],
     loc="lower left", frameon=True, framealpha=0.9,
 )
 
@@ -135,6 +135,10 @@ ev_3857.plot(ax=ax, color="#2e8b57", alpha=0.6, edgecolor="none", zorder = 2) # 
 hb = ax.hexbin(px, py, C=dvf_x_ev["prix_m2"], reduce_C_function=np.median, # reduce_C_function=np.median : on calcule le prix médian au m² par cellule
                gridsize=45, mincnt=10, cmap=cmap, norm=norm, alpha=0.65, linewidths=0, zorder = 1) # mincnt : on ne garde que les cellules avec au moins 10 ventes pour prix fiable 
 fond_de_carte(ax)
+ax.legend(
+    handles=[Patch(facecolor="#2e8b57", alpha=0.6, label="Espaces verts d'après données de la ville de Paris")],
+    loc="lower left", frameon=True, framealpha=0.9,
+)
 cb = fig.colorbar(hb, ax=ax, shrink=0.6, ticks=bornes)
 cb.set_label("Prix médian au m² (€)")
 ax.set_title("Prix médian au m² par zone (cellules d'au moins 10 ventes)")
