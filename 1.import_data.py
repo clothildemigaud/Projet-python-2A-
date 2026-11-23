@@ -32,11 +32,10 @@ FICHIER_LOCAL_DVF_PLUS = "dvf_plus_d75.csv"
 ######################## espaces verts actuels et supplémentaires ########################
 
 ev_actuels = pd.read_csv("data/1.data_brute/espaces_verts.csv", sep=";", encoding="utf-8")
-ev_supp = pd.read_csv("data/1.data_brute/espaces_verts_supplementaires.csv", sep=";", encoding="utf-8")
 
 # visualisation 
 print(ev_actuels.head(10))
-print(ev_supp.head(10))
+
 
 ######################## Parcs et Jardins ouverts au public ########################
 
@@ -141,8 +140,7 @@ col_to_drop = [
                                         "Ouverture 24h_24h",
                                         "ID_DIVISION", "ID_ATELIER_HORTICOLE", "IDA3D_ENB", "ID_EQPT",
                                         "Compétence","last_edited_user",
-                                        "last_edited_date" ]),
-    (ev_supp, ["Type d'opération", "Secteur administratif"]) ]
+                                        "last_edited_date" ])]
 
 for df, cols in col_to_drop:
     df.drop(columns=cols, inplace=True)
@@ -152,8 +150,7 @@ for df, cols in col_to_drop:
 ##
 col_to_integer = [
     (ev_actuels, ["Adresse - Numéro", "Code postal", "Surface calculée", "Superficie totale réelle",
-            "Surface horticole", "Année de l'ouverture"]),
-    (ev_supp, ["M2 d’espaces verts supplémentaires"])
+            "Surface horticole", "Année de l'ouverture"])
 ]
 
 for df, cols in col_to_integer:
@@ -334,10 +331,8 @@ parcs_publics_nettoyee["surface_m2"] = parcs_publics_nettoyee.geometry.area
 # enregistrement des données 
 dvf_plus.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_nettoyee.csv'), index=False)
 ev_actuels.to_csv(os.path.join("data/2.data_nettoyee", 'ev_actuels_nettoyes.csv'), index=False)
-ev_supp.to_csv(os.path.join("data/2.data_nettoyee", 'ev_supp_nettoyes.csv'), index=False)
+
 parcs_publics_nettoyee.to_file("data/2.data_nettoyee/parcs_publics_nettoyee.gpkg", layer="parcs_publics_nettoyee", driver="GPKG")
 # version sans dépendances 
 sans_dependances = dvf_plus[dvf_plus['nb_dependances'] == 0].copy()
 sans_dependances.to_csv(os.path.join("data/2.data_nettoyee", 'dvf_paris_sans_dependances.csv'), index=False)
-
-print(list(dvf_plus.columns))
