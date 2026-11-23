@@ -63,12 +63,12 @@ ev["geometry"] = ev["Geo Shape"].apply(
     lambda s: shape(json.loads(s) if isinstance(s, str) else s)
 )
 gdf_ev = gpd.GeoDataFrame(ev, geometry="geometry", crs="EPSG:4326")   # contours en latitude/longitude
-#ev_3857 = gdf_ev.to_crs("EPSG:3857")                                   # conversion en Web Mercator
+ev_3857 = gdf_ev.to_crs("EPSG:3857")                                   # conversion en Web Mercator
 
 # On garde parcs_publics_nettoyee en Lambert-93 pour calculer les distances en mètres
 parcs_2154 = parcs_publics_nettoyee.to_crs("EPSG:2154").copy()
 parcs_2154["surface_parc_m2"] = parcs_2154.geometry.area
-ev_3857 = parcs_2154.to_crs("EPSG:3857")                             # conversion en Web Mercator
+parcs_3857 = parcs_2154.to_crs("EPSG:3857")                             # conversion en Web Mercator
 
 # cadrage sur Paris (quantiles pour ignorer d'éventuels points isolés)
 marge = 500
@@ -141,19 +141,85 @@ ax.set_title("Prix médian au m² par zone (cellules d'au moins 10 ventes)")
 fig.savefig("figures/carte_prix_m2.png", dpi=200, bbox_inches="tight")
 plt.show()
 
+# %%
+# ----------------------------------------------------------------------------------------
+#                 Carte 3 : Typologie des espaces verts (Parc, Jardin, Square)
+# ----------------------------------------------------------------------------------------
 
+COL_TYPE_ESPACE = "nature"
 
+# On prépare les parcs en Web Mercator (EPSG:3857) avec des majuscules propres
+parcs_3857 = parcs_publics_nettoyee.to_crs("EPSG:3857").copy()
+#parcs_3857[COL_TYPE_PARC] = parcs_3857[COL_TYPE_PARC].str.strip().str.capitalize()
 
-##########################################################################################
-#                                                                                        #
-#                                  Analyse descriptive des données                                  #
-#                                                                                        #                      
-##########################################################################################
+couleurs_types = {
+    "Parc": "#005a32",    # vert très foncé
+    "Jardin": "#238b45",  # vert moyen
+    "Square": "#74c476",  # vert clair
+}
+
+fig, ax = plt.subplots(figsize=(11, 9))
+
+# Tracé catégorie par catégorie pour maîtriser les couleurs et l'ordre d'affichage
+for type_ev in ["Square", "Jardin", "Parc"]:  # On trace les grands parcs en dernier pour qu'ils ressortent bien
+    sous_gdf = parcs_3857[parcs_3857[COL_TYPE_ESPACE] == type_ev]
+    if not sous_gdf.empty:
+        sous_gdf.plot(
+            ax=ax,
+            color=couleurs_types[type_ev],
+            edgecolor="#00441b",
+            linewidth=0.4,
+            alpha=0.85,
+            zorder=2,
+        )
+
+fond_de_carte(ax)
+
+# Légende personnalisée propre
+legend_handles = [
+    Patch(facecolor=couleurs_types["Parc"], edgecolor="#00441b", label="Parc"),
+    Patch(facecolor=couleurs_types["Jardin"], edgecolor="#00441b", label="Jardin"),
+    Patch(facecolor=couleurs_types["Square"], edgecolor="#00441b", label="Square"),
+]
+ax.legend(handles=legend_handles, title="Nature de l'espace vert", loc="lower left", frameon=True, framealpha=0.92)
+ax.set_title("Répartition des espaces verts publics par typologie à Paris")
+
+fig.savefig("figures/carte_typologie_parcs.png", dpi=200, bbox_inches="tight")
+plt.show()
 
 # %%
-sns.set_theme(style="whitegrid", context="notebook")
-os.makedirs("figures", exist_ok=True)
+# ----------------------------------------------------------------------------------------
+#                 Carte 4 : Rayon d'accessibilité de 250 m autour des espaces verts
+# ----------------------------------------------------------------------------------------
 
+# 1. Calcul du buffer de 250 m en mètres (Lambert-93 : EPSG:2154)
+buffers_250m = parcs_2154.buffer(250).union_all()  # fusionne les cercles qui se chevauchent
+gdf_buffers_3857 = gpd.GeoDataFrame(geometry=[buffers_250m], crs="EPSG:2154").to_crs("EPSG:3857")
+
+# 2. Tracé
+fig, ax = plt.subplots(figsize=(11, 9))
+
+# Zone tampon de 250 m en vert très pâle
+gdf_buffers_3857.plot(ax=ax, color="#a1d99b", alpha=0.35, edgecolor="#41ab5d", linewidth=0.8, zorder=1)
+# Espaces verts réels par-dessus en vert foncé
+parcs_3857.plot(ax=ax, color="#006d2c", alpha=0.9, edgecolor="none", zorder=2)
+
+fond_de_carte(ax)
+
+legend_handles = [
+    Patch(facecolor="#006d2c", alpha=0.9, label="Espace vert public"),
+    Patch(facecolor="#a1d99b", alpha=0.45, edgecolor="#41ab5d", label="Zone à moins de 250 m"),
+]
+ax.legend(handles=legend_handles, loc="lower left", frameon=True, framealpha=0.92)
+ax.set_title("Accessibilité aux espaces verts : zones situées à moins de 250 mètres")
+
+fig.savefig("figures/carte_buffers_250m.png", dpi=200, bbox_inches="tight")
+plt.show()
+
+# %%
+# ----------------------------------------------------------------------------------------
+#                 Carte 5 : Ventes colorées selon leur distance au parc le plus proche
+# ----------------------------------------------------------------------------------------
 # Distance au parc public le plus proche (en mètres, grâce au CRS EPSG:2154)
 gdf_desc = gpd.sjoin_nearest(
     pts_2154,
@@ -161,8 +227,54 @@ gdf_desc = gpd.sjoin_nearest(
     how="left",
     distance_col="dist_parc_m",
 )
-print(parcs_publics_nettoyee.columns.tolist())
-COL_TYPE_ESPACE = "nature"
+# On utilise gdf_desc (qui contient dist_parc_m calculé en Lambert-93) et on le passe en 3857
+pts_dist_3857 = gdf_desc.to_crs("EPSG:3857")
+
+fig, ax = plt.subplots(figsize=(11, 9))
+
+# Espaces verts en vert vif
+parcs_3857.plot(ax=ax, color="#1b7837", alpha=0.85, edgecolor="none", zorder=3)
+
+# Hexbin de la distance médiane au parc le plus proche par cellule
+hb = ax.hexbin(
+    pts_dist_3857.geometry.x,
+    pts_dist_3857.geometry.y,
+    C=pts_dist_3857["dist_parc_m"],
+    reduce_C_function=np.median,
+    gridsize=45,
+    mincnt=5,
+    cmap="YlGnBu_r",  # Vert/bleu foncé = très proche d'un parc, jaune = éloigné
+    vmin=0,
+    vmax=500,
+    alpha=0.65,
+    linewidths=0,
+    zorder=2,
+)
+
+fond_de_carte(ax)
+
+cb = fig.colorbar(hb, ax=ax, shrink=0.6, extend="max")
+cb.set_label("Distance médiane au parc le plus proche (mètres)")
+ax.legend(
+    handles=[Patch(facecolor="#1b7837", alpha=0.85, label="Espaces verts publics")],
+    loc="lower left",
+    frameon=True,
+    framealpha=0.92,
+)
+ax.set_title("Accessibilité des logements vendus aux espaces verts publics")
+
+fig.savefig("figures/carte_distance_ventes_ev.png", dpi=200, bbox_inches="tight")
+plt.show()
+##########################################################################################
+#                                                                                        #
+#                                  Analyse descriptive des données                       #
+#                                                                                        #                      
+##########################################################################################
+
+# %%
+sns.set_theme(style="whitegrid", context="notebook")
+os.makedirs("figures", exist_ok=True)
+
 # Évite les doublons si une vente est à égale distance de 2 parcs
 gdf_desc = gdf_desc[~gdf_desc.index.duplicated(keep="first")]
 
