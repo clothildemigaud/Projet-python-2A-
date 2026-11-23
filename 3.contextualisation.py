@@ -19,7 +19,7 @@ import seaborn as sns
 #pour voir toutes les colonnes dans les sorties python
 pd.set_option("display.max_columns", None)  
 
-#os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
+os.chdir("/home/onyxia/work/Projet-python-2A-") #Pour que ça fonctionne sur vscode depuis sspcloud chez Joceran
 print(os.listdir("data/2.data_nettoyee"))
 
 ##########################################################################################
@@ -81,7 +81,6 @@ def fond_de_carte(ax):
     cx.add_basemap(ax, source=cx.providers.Esri.WorldStreetMap, zoom=13, zorder = 0 )   # on importe le fond de carte sur Esri sur lequel on superpose les données 
 
 
-
 #----------------------------------------------------------------------------------------
 #                 Carte 0 : vérification des espaces verts présents dans la base de données 
 #---------------------------------------------------------------------------------------- 
@@ -97,13 +96,12 @@ plt.show()
 
 
 
-
 #----------------------------------------------------------------------------------------
-#                  Carte 1 : concentration des logements et espaces verts  
+#                  Carte 1 : concentration des logements et espaces verts  (base de données Paris)
 #---------------------------------------------------------------------------------------- 
 
 fig, ax = plt.subplots(figsize=(11, 9)) # on crée la figure 
-ev_3857.plot(ax=ax, color="#2e8b57", alpha=0.6, edgecolor="none", zorder = 2) # on trace les espaces verts en vert semi-transparent
+parcs_3857.plot(ax=ax, color="#2e8b57", alpha=0.6, edgecolor="none", zorder = 2) # on trace les espaces verts en vert semi-transparent
 hb = ax.hexbin(px, py, gridsize=45, mincnt=1, cmap="YlOrRd", alpha=0.55, linewidths=0, zorder = 1) # découpe la carte en cellules hexagonales et les colorie selon le nombre de ventes qu'elles contiennent 
 fond_de_carte(ax) #on ajoute le fond de carte 
 
@@ -120,7 +118,7 @@ plt.show()
 
 
 #----------------------------------------------------------------------------------------
-#                 Carte 2 : prix median au m2 par classes 
+#                 Carte 2 : prix median au m2 par classes (base de données paris) 
 #---------------------------------------------------------------------------------------- 
 
 print(dvf_x_ev["prix_m2"].describe(percentiles=[.05, .25, .5, .75, .95]))
@@ -131,12 +129,12 @@ cmap = ListedColormap(couleurs)
 norm = BoundaryNorm(bornes, cmap.N) # associe chaque classe de prix à une couleur
 
 fig, ax = plt.subplots(figsize=(11, 9))
-ev_3857.plot(ax=ax, color="#2e8b57", alpha=0.6, edgecolor="none", zorder = 2) # on trace les espaces verts en vert semi-transparent
+parcs_3857.plot(ax=ax, color="#2e8b57", alpha=0.6, edgecolor="none", zorder = 2) # on trace les espaces verts en vert semi-transparent
 hb = ax.hexbin(px, py, C=dvf_x_ev["prix_m2"], reduce_C_function=np.median, # reduce_C_function=np.median : on calcule le prix médian au m² par cellule
                gridsize=45, mincnt=10, cmap=cmap, norm=norm, alpha=0.65, linewidths=0, zorder = 1) # mincnt : on ne garde que les cellules avec au moins 10 ventes pour prix fiable 
 fond_de_carte(ax)
 ax.legend(
-    handles=[Patch(facecolor="#2e8b57", alpha=0.6, label="Espaces verts d'après données de la ville de Paris")],
+    handles=[Patch(facecolor="#2e8b57", alpha=0.6, label="Parcs et Jardins de plus de 500m ouverts au publics")],
     loc="lower left", frameon=True, framealpha=0.9,
 )
 cb = fig.colorbar(hb, ax=ax, shrink=0.6, ticks=bornes)
@@ -145,7 +143,6 @@ ax.set_title("Prix médian au m² par zone (cellules d'au moins 10 ventes)")
 fig.savefig("figures/carte_prix_m2.png", dpi=200, bbox_inches="tight")
 plt.show()
 
-# %%
 # ----------------------------------------------------------------------------------------
 #                 Carte 3 : Typologie des espaces verts (Parc, Jardin, Square)
 # ----------------------------------------------------------------------------------------
@@ -269,6 +266,66 @@ ax.set_title("Accessibilité des logements vendus aux espaces verts publics")
 
 fig.savefig("figures/carte_distance_ventes_ev.png", dpi=200, bbox_inches="tight")
 plt.show()
+
+# ----------------------------------------------------------------------------------------
+#                 Carte 6 : Superposition de la typologie des parcs et des ventes (DVF)
+# ----------------------------------------------------------------------------------------
+
+fig, ax = plt.subplots(figsize=(11, 9))
+
+# 1. Couche du dessous : densité des ventes immobilières (palette chaude)
+hb = ax.hexbin(
+    px,
+    py,
+    gridsize=45,
+    mincnt=1,
+    cmap="YlOrRd",
+    alpha=0.50,
+    linewidths=0,
+    zorder=1,
+)
+
+# 2. Couche du dessus : espaces verts par nature (palette verte contrastée)
+couleurs_types = {
+    "Parc": "#00441b",    # vert très sombre (fort contraste)
+    "Jardin": "#1b7837",  # vert soutenu
+    "Square": "#41ab5d",  # vert franc (lisible même sur fond orangé)
+}
+
+for type_ev in ["Square", "Jardin", "Parc"]:
+    sous_gdf = parcs_3857[parcs_3857[COL_TYPE_ESPACE] == type_ev]
+    if not sous_gdf.empty:
+        sous_gdf.plot(
+            ax=ax,
+            color=couleurs_types[type_ev],
+            edgecolor="white",  # fin liseré blanc pour détacher le parc des ventes autour
+            linewidth=0.35,
+            alpha=0.90,
+            zorder=2,
+        )
+
+fond_de_carte(ax)
+
+# Barre de couleur pour les ventes + légende pour les 3 types d'espaces verts
+cb = fig.colorbar(hb, ax=ax, shrink=0.6, label="Nombre de ventes par cellule")
+
+legend_handles = [
+    Patch(facecolor=couleurs_types["Parc"], edgecolor="white", label="Parc"),
+    Patch(facecolor=couleurs_types["Jardin"], edgecolor="white", label="Jardin"),
+    Patch(facecolor=couleurs_types["Square"], edgecolor="white", label="Square"),
+]
+ax.legend(
+    handles=legend_handles,
+    title="Nature de l'espace vert",
+    loc="lower left",
+    frameon=True,
+    framealpha=0.92,
+)
+ax.set_title("Densité des ventes immobilières et typologie des espaces verts à Paris")
+
+fig.savefig("figures/carte_ventes_typologie_parcs.png", dpi=200, bbox_inches="tight")
+plt.show()
+
 ##########################################################################################
 #                                                                                        #
 #                                  Analyse descriptive des données                       #
@@ -292,18 +349,19 @@ gdf_desc = gpd.sjoin_nearest(
 
 gdf_desc["tranche_dist"] = pd.cut(
     gdf_desc["dist_parc_m"],
-    bins=[-1, 100, 250, 500, 1000, np.inf],
-    labels=["0–100 m", "100–250 m", "250–500 m", "500–1000 m", "> 1000 m"],
-)
+    bins=[-1, 100, 250, 500, 1000],
+    labels=["0–100 m", "100–250 m", "250–500 m", "500–1000 m"],     #Il n'y a pas de ventes à plus de 1000m
+)                                                                   
 
+#----------------------------------------------------------------------------------------
+#                           Tables de statistique descriptive 
+#----------------------------------------------------------------------------------------   
 
-# %%
 print("=== 1. PARCS PUBLICS (parcs_publics_nettoyee) ===")
 print(f"Nombre de parcs : {len(parcs_2154)}")
 print(parcs_2154["surface_parc_m2"].describe(percentiles=[0.25, 0.5, 0.75, 0.9]).round(2))
 
 print("\n=== 2. VENTES IMMOBILIÈRES (dvf_x_ev) ===")
-# ⚠️ Vérifie les noms exacts de tes colonnes de surface/pièces dans dvf_x_ev
 cols_a_decrire = [c for c in ["prix_m2", "surface_reelle_bati", "nombre_pieces_principales", "dist_parc_m"] if c in gdf_desc.columns]
 print(gdf_desc[cols_a_decrire].describe(percentiles=[0.05, 0.25, 0.5, 0.75, 0.95]).round(1))
 
@@ -332,7 +390,7 @@ pivot_prix = gdf_desc.pivot_table(
     observed=False,
 ).round(0)
 print(pivot_prix)
-# %%
+
 # --- Graphique A : Distributions univariées (taille des parcs & distance aux parcs) ---
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
@@ -354,10 +412,9 @@ plt.tight_layout()
 fig.savefig("figures/desc_univariee.png", dpi=200)
 plt.show()
 
-# %%
-# --- Graphique B : Boxplot prix/m² par tranche de distance (hors 1% extrêmes) ---
-p01, p99 = gdf_desc["prix_m2"].quantile([0.01, 0.99])
-df_clean_visu = gdf_desc[(gdf_desc["prix_m2"] >= p01) & (gdf_desc["prix_m2"] <= p99)]
+# --- Graphique B : Boxplot prix/m² par tranche de distance ---
+#p01, p99 = gdf_desc["prix_m2"].quantile([0.01, 0.99])        # Arajouter si on veut enlever les 1% extrèmes
+df_clean_visu = gdf_desc#[(gdf_desc["prix_m2"] >= p01) & (gdf_desc["prix_m2"] <= p99)]
 
 fig, ax = plt.subplots(figsize=(10, 6))
 sns.boxplot(data=df_clean_visu, x="tranche_dist", y="prix_m2", palette="Greens_r", showfliers=False, ax=ax)
@@ -368,7 +425,6 @@ plt.tight_layout()
 fig.savefig("figures/desc_boxplot_prix_distance.png", dpi=200)
 plt.show()
 
-# %%
 # --- Graphique C : Courbe de gradient (0 à 800 m) selon le type (Parc / Jardin / Square) ---
 df_grad = df_clean_visu[df_clean_visu["dist_parc_m"] <= 800].copy()
 df_grad["pas_50m"] = (df_grad["dist_parc_m"] // 50) * 50 + 25
