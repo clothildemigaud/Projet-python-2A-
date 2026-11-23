@@ -16,7 +16,7 @@ donnees = dossier / "data" / "2.data_nettoyee"
 colonnes = [
     "id_vente", "id_parcelle", "date", "prix_m2", "surface_m2",
     "nb_pieces", "nb_dependances", "code_arrondissement",
-    "x_lambert93", "y_lambert93",
+    "x_lambert93", "y_lambert93", "dist_ev_m",
 ]
 
 ventes = pd.read_csv(
@@ -32,6 +32,7 @@ ventes = ventes.loc[
 assert ventes["id_vente"].is_unique, "Plusieurs lignes ont le même identifiant de vente."
 assert ventes.notna().all().all(), "Certaines ventes ont des informations manquantes."
 assert ventes["surface_m2"].gt(0).all(), "Certaines surfaces sont nulles ou négatives."
+assert ventes["dist_ev_m"].ge(0).all(), "Certaines distances de l'ancien inventaire sont négatives."
 
 ventes["log_prix_m2"] = np.log(ventes["prix_m2"])
 ventes["log_surface"] = np.log(ventes["surface_m2"])
@@ -71,6 +72,7 @@ morceaux = gpd.GeoSeries(parcs.geometry.union_all(), crs=2154)
 morceaux = morceaux.explode().reset_index(drop=True)
 
 for rayon in [500, 1000]:
+    print(f"Calcul des surfaces dans un rayon de {rayon} m…", flush=True)
     disques = lieux.geometry.buffer(rayon)
 
     # Repérer les polygones qui touchent chaque disque.
@@ -93,30 +95,44 @@ base = ventes.merge(mesures, on=xy, how="left", validate="many_to_one")
 assert len(base) == len(ventes)
 assert base["distance_m"].ge(0).all()
 
-# Le coefficient de distance se lira pour 100 mètres supplémentaires.
-base["distance_100m"] = base["distance_m"] / 100
+# Les deux distances sont exprimées en centaines de mètres.
+base["distance_ev_100m"] = base["dist_ev_m"] / 100   # Ancien inventaire
+base["distance_100m"] = base["distance_m"] / 100     # Parcs, jardins et squares
 
 
 # 4. Estimer les régressions sur les mêmes ventes
 
-# M1 : relation brute entre distance et prix au m².
+# M1 : relation brute entre la distance au parc, jardin ou square et le prix au m².
 m1 = "log_prix_m2 ~ distance_100m"
 
-# M2 : ajouter les caractéristiques du logement, la période et l'arrondissement.
-m2 = m1 + " + log_surface + C(nb_pieces) + C(trimestre) + C(code_arrondissement)"
+# Les deux versions de M2 utilisent exactement les mêmes contrôles.
+controles = " + log_surface + C(nb_pieces) + C(trimestre) + C(code_arrondissement)"
+
+# M2 avec la distance à l'espace vert le plus proche dans l'ancien inventaire.
+m2_espaces_verts = "log_prix_m2 ~ distance_ev_100m" + controles
+
+# M2 avec la distance au parc, jardin ou square le plus proche.
+m2 = m1 + controles
 
 # M3 : comparer les ventes qui ont le même parc, jardin ou square le plus proche.
 m3 = m2 + " + C(nom)"
 
-# M4 : ajouter la surface accessible dans le voisinage géographique.
-# On estime séparément les deux rayons.
+# M4 : ajouter la surface cumulée dans le rayon de 500 m ou de 1 km.
 formules = {
     "M1": m1,
+    "M2_espaces_verts": m2_espaces_verts,
     "M2": m2,
     "M3": m3,
     "M4_500m": m3 + " + parcs_500m_ha",
     "M4_1km": m3 + " + parcs_1000m_ha",
 }
+
+variables_a_afficher = [
+    "distance_ev_100m",
+    "distance_100m",
+    "parcs_500m_ha",
+    "parcs_1000m_ha",
+]
 
 lignes = []
 for nom_modele, formule in formules.items():
@@ -126,7 +142,7 @@ for nom_modele, formule in formules.items():
         cov_kwds={"groups": base["id_parcelle"]},
     )
 
-    for variable in ["distance_100m", "parcs_500m_ha", "parcs_1000m_ha"]:
+    for variable in variables_a_afficher:
         if variable in modele.params:
             bas, haut = modele.conf_int().loc[variable]
             lignes.append({
