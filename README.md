@@ -12,7 +12,7 @@ Nous concentrons ici notre enquête sur Paris intramuros.
 
 ## Données 
 Nous exploitons les données suivantes : 
-- prix au mètre carré des logements à Paris vendus entre 2024 et 2026
+- prix au mètre carré des logements à Paris vendus entre 2014 et 2026
 - localisation et surface des espaces verts parisiens tels que recensés par la Ville de Paris 
 - localisation et surface des espaces verts parisiens recensés par le ministère de la transition écologique
 
