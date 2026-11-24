@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 **Lancement**. Ouvrir le notebook `main.ipynb`, qui constitue le rapport analytique principal du projet.
 
-Certaines données étant stockées dans un dossier hebergé sur google drive, nous avons partagé ledit dossier à notre chargé de TD, afin que l'import fonctionne. 
+Certaines données étant stockées dans un dossier hebergé sur google drive, nous avons partagé ledit dossier à notre chargé de TD, afin que l'import fonctionne. Si besoin, le dossier est accessible au lien suivant : https://drive.google.com/drive/folders/1pCbUYh9dp9OUCQJH-HGou9i4GJB4-9UD?usp=share_link
 
 ## Structure du repo 
 - dossier `data` : contient les données brutes et reçoit les données nettoyées 
