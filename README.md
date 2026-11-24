@@ -23,8 +23,6 @@ Ces données ont obtenues au sources suivantes, respectivement:
 
 La base de données du ministère est plus complète et présente de meilleurs résultats. 
 
-## Modèle
-... TO DO 
 
 ## Reproduction du projet
 **Installation**. Cloner le projet.
