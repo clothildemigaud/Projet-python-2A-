@@ -31,7 +31,7 @@ Installer les dépendances Python à l’aide de la commande :
 pip install -r requirements.txt
 ```
 
-**Lancement**. Ouvrir le notebook `main.ipynb`, qui constitue le rapport analytique principal du projet.
+**Lancement**. Ouvrir le notebook `rapport_final_main.ipynb`, qui constitue le rapport analytique principal du projet, et le lancer.
 
 Certaines données étant stockées dans un dossier hebergé sur google drive, nous avons partagé ledit dossier à notre chargé de TD, afin que l'import fonctionne. Si besoin, le dossier est accessible au lien suivant : https://drive.google.com/drive/folders/1pCbUYh9dp9OUCQJH-HGou9i4GJB4-9UD?usp=share_link
 
